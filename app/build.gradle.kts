@@ -17,6 +17,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Release signing is injected via -P flags from the GitHub Actions workflow.
+        // When the KEYSTORE_BASE64 secret is set the workflow passes these properties;
+        // otherwise the build falls back to the debug key automatically.
+        val storeFile   = findProperty("android.injected.signing.store.file")   as String?
+        val storePass   = findProperty("android.injected.signing.store.password") as String?
+        val keyAlias    = findProperty("android.injected.signing.key.alias")    as String?
+        val keyPass     = findProperty("android.injected.signing.key.password") as String?
+
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile     = file(storeFile)
+                this.storePassword = storePass
+                this.keyAlias      = keyAlias
+                this.keyPassword   = keyPass
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -24,6 +43,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Use the release signing config only when it was configured above
+            val releaseCfg = signingConfigs.findByName("release")
+            if (releaseCfg != null) signingConfig = releaseCfg
         }
     }
 
