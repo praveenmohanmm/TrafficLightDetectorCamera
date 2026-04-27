@@ -111,7 +111,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
             if (poleDetections.isNotEmpty()) {
                 val label = poleDetections.first()
                     .categories().maxByOrNull { it.score() }
-                    ?.categoryName()?.orElse("Traffic Object") ?: "Traffic Object"
+                    ?.categoryName() ?: "Traffic Object"
                 binding.statusText.text = "DETECTED: ${label.uppercase()}"
                 binding.statusText.setBackgroundResource(R.color.alert_red)
                 soundManager.playAlert()

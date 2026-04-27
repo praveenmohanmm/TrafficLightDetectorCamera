@@ -73,7 +73,7 @@ class ObjectDetectorHelper(
         val poles = all.filter { det ->
             det.categories().any { cat ->
                 trafficPoleClasses.contains(
-                    cat.categoryName().orElse("").lowercase().trim()
+                    (cat.categoryName() ?: "").lowercase().trim()
                 )
             }
         }

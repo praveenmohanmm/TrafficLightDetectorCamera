@@ -86,7 +86,7 @@ class OverlayView @JvmOverloads constructor(
             canvas.drawRect(l, t, r, b, boxPaint)
 
             val topCat = det.categories().maxByOrNull { it.score() } ?: continue
-            val label  = "${topCat.categoryName().orElse("?")}  ${"%.0f".format(topCat.score() * 100)}%"
+            val label  = "${topCat.categoryName() ?: "?"}  ${"%.0f".format(topCat.score() * 100)}%"
 
             lblPaint.getTextBounds(label, 0, label.length, textBounds)
             val lblW = textBounds.width().toFloat()
