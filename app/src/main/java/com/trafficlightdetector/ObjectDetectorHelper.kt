@@ -14,10 +14,8 @@ import com.google.mediapipe.tasks.vision.objectdetector.ObjectDetectorResult
  * Wraps the MediaPipe Tasks object detector.
  *
  * Model : EfficientDet-Lite0 (COCO int8, ~4.4 MB) from MediaPipe model zoo.
- * Traffic-pole proxy classes filtered from COCO:
- *   - traffic light  → signal head on a pole
- *   - stop sign      → sign on a roadside post
- *   - parking meter  → meter on a short post
+ * Only "traffic light" detections are surfaced — all other COCO classes are
+ * discarded before results reach the UI or audio alert.
  */
 class ObjectDetectorHelper(
     private val context: Context,
@@ -25,11 +23,7 @@ class ObjectDetectorHelper(
 ) {
     private var detector: ObjectDetector? = null
 
-    private val trafficPoleClasses = setOf(
-        "traffic light",
-        "stop sign",
-        "parking meter"
-    )
+    private val trafficLightClasses = setOf("traffic light")
 
     init { setup() }
 
@@ -69,18 +63,18 @@ class ObjectDetectorHelper(
         val mpImage = BitmapImageBuilder(upright).build()
         val result: ObjectDetectorResult = detector!!.detect(mpImage)
 
-        val all   = result.detections()
-        val poles = all.filter { det ->
+        // Keep only traffic-light detections; everything else is discarded
+        val trafficLights = result.detections().filter { det ->
             det.categories().any { cat ->
-                trafficPoleClasses.contains(
+                trafficLightClasses.contains(
                     (cat.categoryName() ?: "").lowercase().trim()
                 )
             }
         }
 
         listener.onResults(
-            allDetections  = all,
-            poleDetections = poles,
+            allDetections  = trafficLights,
+            poleDetections = trafficLights,
             imageWidth     = upright.width,
             imageHeight    = upright.height
         )
