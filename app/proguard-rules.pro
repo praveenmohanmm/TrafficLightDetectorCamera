@@ -1,3 +1,8 @@
+# ── App classes ──────────────────────────────────────────────────────────────
+# OverlayView is referenced by name in activity_main.xml — R8 must not rename
+# or remove any class in this package or layout inflation crashes on launch.
+-keep class com.trafficlightdetector.** { *; }
+
 # ── MediaPipe Tasks ───────────────────────────────────────────────────────────
 -keep class com.google.mediapipe.** { *; }
 -keep class com.google.mediapipe.tasks.** { *; }

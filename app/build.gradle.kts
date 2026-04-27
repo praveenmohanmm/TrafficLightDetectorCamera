@@ -63,8 +63,9 @@ android {
             if (releaseCfg != null) signingConfig = releaseCfg
         }
         debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix   = "-debug"
+            // No applicationIdSuffix — keeps the same package ID as release
+            // so the app can be replaced in-place during testing.
+            versionNameSuffix = "-debug"
         }
     }
 
@@ -85,16 +86,6 @@ android {
     androidResources {
         noCompress += "tflite"
     }
-
-    // Human-readable output file names
-    applicationVariants.all {
-        outputs.all {
-            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            if (buildType.name == "release") {
-                output?.outputFileName = "TrafficLightDetector-${ciVersionName}.apk"
-            }
-        }
-    }
 }
 
 dependencies {
@@ -103,7 +94,6 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-ktx:1.8.2")
 
     // CameraX
     val cameraxVersion = "1.3.2"
