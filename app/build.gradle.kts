@@ -13,21 +13,28 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) load(keystorePropsFile.inputStream())
 }
 
+// ── Version — driven by CI environment variables ──────────────────────────────
+// BUILD_NUMBER  : set to github.run_number in CI  (monotonically increasing int)
+// VERSION_NAME  : set to tag name or "1.0.<build>" in CI
+// Local builds fall back to (1, "1.0-dev") so gradle always compiles.
+val ciBuildNumber  = (System.getenv("BUILD_NUMBER")  ?: "1").toInt()
+val ciVersionName  = System.getenv("VERSION_NAME")   ?: "1.0-dev"
+
 android {
-    namespace = "com.trafficlightdetector"
+    namespace  = "com.trafficlightdetector"
     compileSdk = 34
 
     defaultConfig {
         applicationId = "com.trafficlightdetector"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        minSdk        = 24
+        targetSdk     = 34
+        versionCode   = ciBuildNumber
+        versionName   = ciVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Only include native libs for real phone architectures.
-        // Drops x86 / x86_64 (emulator-only) — cuts ~30 MB from MediaPipe .so files.
+        // Only include native libs for real phone ABIs.
+        // Drops x86 / x86_64 (emulator-only) — saves ~30 MB from MediaPipe .so files.
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
@@ -36,24 +43,28 @@ android {
     signingConfigs {
         if (keystorePropsFile.exists()) {
             create("release") {
-                storeFile     = file(keystoreProps["storeFile"]     as String)
-                storePassword = keystoreProps["storePassword"]      as String
-                keyAlias      = keystoreProps["keyAlias"]           as String
-                keyPassword   = keystoreProps["keyPassword"]        as String
+                storeFile     = file(keystoreProps["storeFile"]  as String)
+                storePassword = keystoreProps["storePassword"]   as String
+                keyAlias      = keystoreProps["keyAlias"]        as String
+                keyPassword   = keystoreProps["keyPassword"]     as String
             }
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled   = true   // R8 removes unused code
-            isShrinkResources = true   // removes unused drawables/strings/etc.
+            isMinifyEnabled   = true   // R8 dead-code elimination
+            isShrinkResources = true   // remove unused resources
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             val releaseCfg = signingConfigs.findByName("release")
             if (releaseCfg != null) signingConfig = releaseCfg
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix   = "-debug"
         }
     }
 
@@ -67,11 +78,22 @@ android {
     }
 
     buildFeatures {
-        viewBinding = true
+        viewBinding  = true
+        buildConfig  = true   // exposes BuildConfig.VERSION_NAME etc.
     }
 
     androidResources {
         noCompress += "tflite"
+    }
+
+    // Human-readable output file names
+    applicationVariants.all {
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            if (buildType.name == "release") {
+                output?.outputFileName = "TrafficLightDetector-${ciVersionName}.apk"
+            }
+        }
     }
 }
 
@@ -81,6 +103,7 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-ktx:1.8.2")
 
     // CameraX
     val cameraxVersion = "1.3.2"
@@ -89,7 +112,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
-    // MediaPipe Tasks Vision — matches the EfficientDet-Lite0 model format
+    // MediaPipe Tasks Vision — EfficientDet-Lite0 model format
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
 
     testImplementation("junit:junit:4.13.2")

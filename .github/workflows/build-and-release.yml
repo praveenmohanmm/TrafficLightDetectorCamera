@@ -1,4 +1,4 @@
-name: Build & Release APK
+name: Build & Release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v1.2.0). Leave blank to use build number.'
+        description: 'Release tag / version name (e.g. v1.2.0). Leave blank → auto build-NNN.'
         required: false
         default: ''
 
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    name: Build APK and publish release
+    name: Build APK + AAB and publish release
     runs-on: ubuntu-latest
 
     steps:
@@ -50,10 +50,24 @@ jobs:
       - name: Download EfficientDet-Lite0 model
         run: bash scripts/download_model.sh
 
-      # ── 6. Write keystore.properties ─────────────────────────────────────────
-      #   If KEYSTORE_BASE64 secret is set  → decode the real keystore.
-      #   Otherwise                         → generate a self-signed keystore.
-      #   Both paths write keystore.properties so build.gradle.kts reads it.
+      # ── 6. Compute version strings ───────────────────────────────────────────
+      - name: Compute version
+        id: version
+        run: |
+          BUILD=${{ github.run_number }}
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="v1.0.${BUILD}"
+          fi
+          echo "tag=${TAG}"          >> "$GITHUB_OUTPUT"
+          echo "build=${BUILD}"      >> "$GITHUB_OUTPUT"
+          echo "name=${TAG}"         >> "$GITHUB_OUTPUT"
+          echo "Version: ${TAG}  (versionCode=${BUILD})"
+
+      # ── 7. Prepare keystore ──────────────────────────────────────────────────
+      #   Real key  → decode KEYSTORE_BASE64 secret
+      #   No secret → generate a self-signed key (good enough for testing)
       - name: Prepare keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -74,7 +88,6 @@ jobs:
           EOF
           else
             echo "No signing secret — generating self-signed keystore"
-            # PKCS12 keystores require storepass == keypass for apksigner
             keytool -genkey -v \
               -keystore "$GITHUB_WORKSPACE/keystore.jks" \
               -alias    "ci-key" \
@@ -90,14 +103,17 @@ jobs:
           keyPassword=ci_pass
           EOF
           fi
-          echo "keystore.properties written:"
-          cat "$GITHUB_WORKSPACE/keystore.properties"
 
-      # ── 7. Build signed release APK ──────────────────────────────────────────
-      - name: Build release APK
-        run: ./gradlew assembleRelease
+      # ── 8. Build signed release APK + AAB ───────────────────────────────────
+      #   APK  → for sideloading / direct download
+      #   AAB  → for Google Play Store submission
+      - name: Build release APK and AAB
+        env:
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: ./gradlew assembleRelease bundleRelease
 
-      # ── 8. Locate built APK ──────────────────────────────────────────────────
+      # ── 9. Locate output files ───────────────────────────────────────────────
       - name: Find APK path
         id: apk
         run: |
@@ -105,34 +121,38 @@ jobs:
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           echo "name=$(basename $APK)" >> "$GITHUB_OUTPUT"
 
-      # ── 9. Compute release tag ───────────────────────────────────────────────
-      - name: Compute release tag
-        id: tag
+      - name: Find AAB path
+        id: aab
         run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=build-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          fi
+          AAB=$(find app/build/outputs/bundle/release -name "*.aab" | head -1)
+          echo "path=$AAB" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename $AAB)" >> "$GITHUB_OUTPUT"
 
       # ── 10. Publish GitHub Release ───────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name:   ${{ steps.tag.outputs.value }}
-          name:       "Traffic Pole Detector — ${{ steps.tag.outputs.value }}"
+          tag_name: ${{ steps.version.outputs.tag }}
+          name:     "Traffic Light Detector ${{ steps.version.outputs.name }}"
           body: |
-            ## Traffic Light / Pole Detector
+            ## Traffic Light Detector ${{ steps.version.outputs.name }}
 
-            ### Install (Android sideload)
-            1. Download **${{ steps.apk.outputs.name }}** below.
-            2. On your Android device go to **Settings → Install unknown apps** and allow your browser/file manager.
+            | Artifact | Use for |
+            |---|---|
+            | **${{ steps.apk.outputs.name }}** | Sideload / direct install on Android |
+            | **${{ steps.aab.outputs.name }}** | Google Play Store upload |
+
+            ### Sideload install
+            1. Download the `.apk` file to your Android device.
+            2. Go to **Settings → Install unknown apps** and allow your browser / file manager.
             3. Open the downloaded APK and tap **Install**.
-            4. Grant camera permission when prompted.
+            4. Grant **Camera** and **Location** permissions when prompted.
 
-            > **Built from commit:** `${{ github.sha }}`
-            > **Run:** #${{ github.run_number }}
-          files: ${{ steps.apk.outputs.path }}
-          draft: false
+            > **Version:** `${{ steps.version.outputs.name }}` (build ${{ github.run_number }})
+            > **Commit:** `${{ github.sha }}`
+          files: |
+            ${{ steps.apk.outputs.path }}
+            ${{ steps.aab.outputs.path }}
+          draft:      false
           prerelease: false
           make_latest: true

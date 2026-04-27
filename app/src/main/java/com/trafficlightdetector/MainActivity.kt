@@ -88,8 +88,20 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private val locationPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) startLocationUpdates()
-        // Location optional — app still works without it (alerts always on)
+        if (granted) {
+            startLocationUpdates()
+        } else {
+            // Location is optional — alerts stay on without it (fail-open).
+            // Only show rationale if Android says we can ask again.
+            if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                Toast.makeText(
+                    this,
+                    "Location access lets the app pause alerts when you're stationary. " +
+                    "You can grant it later in App Settings.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
