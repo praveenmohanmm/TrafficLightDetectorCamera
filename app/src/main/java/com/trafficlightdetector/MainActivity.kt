@@ -14,8 +14,8 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import com.google.mediapipe.tasks.components.containers.Detection
 import com.trafficlightdetector.databinding.ActivityMainBinding
-import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         setContentView(binding.root)
 
         soundManager = SoundAlertManager()
-        detector = ObjectDetectorHelper(context = this, listener = this)
+        detector     = ObjectDetectorHelper(context = this, listener = this)
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -97,20 +97,21 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // --- ObjectDetectorHelper.DetectorListener ---
+    // ── ObjectDetectorHelper.DetectorListener ────────────────────────────────
 
     override fun onResults(
-        allDetections: MutableList<Detection>,
+        allDetections:  List<Detection>,
         poleDetections: List<Detection>,
-        imageWidth: Int,
-        imageHeight: Int
+        imageWidth:     Int,
+        imageHeight:    Int
     ) {
         runOnUiThread {
             binding.overlay.update(allDetections, poleDetections, imageWidth, imageHeight)
 
             if (poleDetections.isNotEmpty()) {
-                val label = poleDetections.first().categories
-                    .maxByOrNull { it.score }?.label ?: "Traffic Object"
+                val label = poleDetections.first()
+                    .categories().maxByOrNull { it.score() }
+                    ?.categoryName()?.orElse("Traffic Object") ?: "Traffic Object"
                 binding.statusText.text = "DETECTED: ${label.uppercase()}"
                 binding.statusText.setBackgroundResource(R.color.alert_red)
                 soundManager.playAlert()

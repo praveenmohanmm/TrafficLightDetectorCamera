@@ -82,11 +82,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
-    // TensorFlow Lite - Task Vision API (handles model + labels via metadata)
-    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
-    // GPU acceleration (optional, falls back to CPU)
-    implementation("org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    // MediaPipe Tasks Vision — matches the EfficientDet-Lite0 model format
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
