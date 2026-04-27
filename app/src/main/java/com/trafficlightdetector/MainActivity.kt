@@ -40,22 +40,36 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private var camera: Camera? = null
 
     /**
-     * Current speed in m/s.
-     * Starts at 0 (stationary) — alerts are suppressed until GPS confirms movement.
-     * If the location provider cannot supply a speed value we keep 0 (conservative:
-     * no false alerts while standing still).
+     * Last confirmed speed in m/s from GPS.
+     * Only written when Location.hasSpeed() == true.
      */
     @Volatile private var currentSpeedMs: Float = 0f
 
+    /**
+     * True once GPS has delivered at least one update that includes a speed value.
+     * Until then we have no ground truth, so we assume the vehicle is moving (alerts on).
+     * This handles: cold GPS start, permission denied, network-only provider.
+     */
+    @Volatile private var hasSpeedReading: Boolean = false
+
+    /**
+     * True when alerts should fire.
+     * - No speed reading yet → assume moving (fail-open: don't suppress alerts with no data).
+     * - Speed reading received → only moving if speed ≥ threshold.
+     */
     private val isMoving: Boolean
-        get() = currentSpeedMs >= MOVING_THRESHOLD_MS
+        get() = !hasSpeedReading || currentSpeedMs >= MOVING_THRESHOLD_MS
 
     // ── Location listener ─────────────────────────────────────────────────────
 
     private val locationListener = LocationListener { location ->
-        // If the provider cannot supply a speed value treat it as 0 (stationary).
-        // This prevents the old "no-fix = allow alerts" false positives.
-        currentSpeedMs = if (location.hasSpeed()) location.speed else 0f
+        if (location.hasSpeed()) {
+            // GPS gave us a real speed value — use it
+            currentSpeedMs  = location.speed
+            hasSpeedReading = true
+        }
+        // If hasSpeed() == false (network provider, no fix) don't touch currentSpeedMs.
+        // isMoving will stay true via the !hasSpeedReading path so alerts keep working.
         runOnUiThread { updateSpeedBadge() }
     }
 
@@ -183,20 +197,23 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() {
-        try {
-            val provider = when {
-                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)     -> LocationManager.GPS_PROVIDER
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                else -> return
+        // Register with BOTH providers simultaneously.
+        // GPS gives accurate speed once locked; network gives faster first fix.
+        // Both call the same locationListener — whichever fires first wins each update.
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->
+            try {
+                if (locationManager.isProviderEnabled(provider)) {
+                    locationManager.requestLocationUpdates(
+                        provider,
+                        LOCATION_INTERVAL_MS,
+                        LOCATION_MIN_DISTANCE_M,
+                        locationListener
+                    )
+                    Log.d(TAG, "Location updates started on $provider")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not start $provider updates: ${e.message}")
             }
-            locationManager.requestLocationUpdates(
-                provider,
-                LOCATION_INTERVAL_MS,
-                LOCATION_MIN_DISTANCE_M,
-                locationListener
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not start location updates: ${e.message}")
         }
     }
 
@@ -206,7 +223,10 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     }
 
     private fun updateSpeedBadge() {
-        binding.speedBadge.text = "${"%.0f".format(currentSpeedMs * 3.6f)} km/h"
+        binding.speedBadge.text = if (hasSpeedReading)
+            "${"%.0f".format(currentSpeedMs * 3.6f)} km/h"
+        else
+            "-- km/h"  // waiting for GPS fix
     }
 
     // ── ObjectDetectorHelper.DetectorListener ────────────────────────────────
