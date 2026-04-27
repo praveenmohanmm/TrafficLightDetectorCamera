@@ -61,6 +61,8 @@ jobs:
           KEY_PASSWORD:    ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD:  ${{ secrets.STORE_PASSWORD }}
         run: |
+          echo "KEYSTORE_BASE64 present: $([ -n "$KEYSTORE_BASE64" ] && echo YES || echo NO)"
+          echo "KEY_ALIAS present:       $([ -n "$KEY_ALIAS" ]       && echo YES || echo NO)"
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using repository signing key"
             echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
@@ -72,18 +74,20 @@ jobs:
           EOF
           else
             echo "No signing secret — generating self-signed keystore"
+            # PKCS12 keystores require storepass == keypass for apksigner
             keytool -genkey -v \
               -keystore "$GITHUB_WORKSPACE/keystore.jks" \
               -alias    "ci-key" \
               -keyalg   RSA -keysize 2048 -validity 10000 \
-              -storepass "ci_store_pass" \
-              -keypass   "ci_key_pass" \
+              -storetype PKCS12 \
+              -storepass "ci_pass" \
+              -keypass   "ci_pass" \
               -dname     "CN=CI Build, OU=CI, O=TrafficLightDetector, L=Unknown, ST=Unknown, C=US"
             cat > "$GITHUB_WORKSPACE/keystore.properties" <<EOF
           storeFile=$GITHUB_WORKSPACE/keystore.jks
-          storePassword=ci_store_pass
+          storePassword=ci_pass
           keyAlias=ci-key
-          keyPassword=ci_key_pass
+          keyPassword=ci_pass
           EOF
           fi
           echo "keystore.properties written:"
