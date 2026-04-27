@@ -3,17 +3,21 @@ package com.trafficlightdetector
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -32,13 +36,15 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var locationManager: LocationManager
 
+    /** CameraX Camera object — available after startCamera() binds successfully. */
+    private var camera: Camera? = null
+
     /**
      * Current GPS speed in m/s.
-     * -1f = no GPS fix yet → we allow alerts (fail-safe).
+     * -1f = no GPS fix yet → alerts allowed (fail-safe).
      */
     @Volatile private var currentSpeedMs: Float = NO_FIX_SPEED
 
-    /** True when the vehicle is moving fast enough to trigger alerts. */
     private val isMoving: Boolean
         get() = currentSpeedMs < 0f || currentSpeedMs >= MOVING_THRESHOLD_MS
 
@@ -46,6 +52,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     private val locationListener = LocationListener { location ->
         currentSpeedMs = if (location.hasSpeed()) location.speed else NO_FIX_SPEED
+        runOnUiThread { updateSpeedBadge() }
     }
 
     // ── Permission launchers ──────────────────────────────────────────────────
@@ -64,7 +71,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) startLocationUpdates()
-        // Location is optional — app still works without it (alerts always on)
+        // Location optional — app still works without it (alerts always on)
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -74,30 +81,51 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Keep screen on while the app is in the foreground
+        // Keep screen on; extend layout into status bar area
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        )
 
         soundManager  = SoundAlertManager()
         detector      = ObjectDetectorHelper(context = this, listener = this)
         cameraExecutor = Executors.newSingleThreadExecutor()
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
 
+        setupZoomButtons()
+
         // Camera permission (required)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
-        ) {
-            startCamera()
-        } else {
-            cameraPermLauncher.launch(Manifest.permission.CAMERA)
-        }
+        ) startCamera()
+        else cameraPermLauncher.launch(Manifest.permission.CAMERA)
 
         // Location permission (optional — used only for speed check)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED
-        ) {
-            startLocationUpdates()
-        } else {
-            locationPermLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        ) startLocationUpdates()
+        else locationPermLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+    // ── Zoom ──────────────────────────────────────────────────────────────────
+
+    private fun setupZoomButtons() {
+        binding.btnZoomIn.setOnClickListener  { adjustZoom(+ZOOM_STEP) }
+        binding.btnZoomOut.setOnClickListener { adjustZoom(-ZOOM_STEP) }
+    }
+
+    private fun adjustZoom(delta: Float) {
+        val cam   = camera ?: return
+        val state = cam.cameraInfo.zoomState.value ?: return
+        val next  = (state.zoomRatio + delta)
+            .coerceIn(state.minZoomRatio, state.maxZoomRatio)
+        cam.cameraControl.setZoomRatio(next)
+    }
+
+    private fun observeZoomState() {
+        camera?.cameraInfo?.zoomState?.observe(this) { state ->
+            binding.zoomLabel.text = "${"%.1f".format(state.zoomRatio)}×"
         }
     }
 
@@ -134,12 +162,13 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                camera = cameraProvider.bindToLifecycle(
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     imageAnalysis
                 )
+                observeZoomState()
             } catch (e: Exception) {
                 Log.e(TAG, "Camera binding failed", e)
             }
@@ -151,11 +180,10 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() {
         try {
-            // Prefer GPS; fall back to network for initial fix
             val provider = when {
                 locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)     -> LocationManager.GPS_PROVIDER
                 locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                else -> return   // no provider available — alerts remain always-on
+                else -> return
             }
             locationManager.requestLocationUpdates(
                 provider,
@@ -173,6 +201,13 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         catch (e: Exception) { Log.w(TAG, "removeUpdates failed: ${e.message}") }
     }
 
+    private fun updateSpeedBadge() {
+        binding.speedBadge.text = if (currentSpeedMs >= 0f)
+            "${"%.0f".format(currentSpeedMs * 3.6f)} km/h"
+        else
+            "-- km/h"
+    }
+
     // ── ObjectDetectorHelper.DetectorListener ────────────────────────────────
 
     override fun onResults(
@@ -186,21 +221,17 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
             when {
                 !isMoving -> {
-                    // Vehicle is stationary — suppress audio, show paused state
-                    binding.statusText.text = getString(R.string.stopped)
-                    binding.statusText.setBackgroundResource(R.color.status_bg)
+                    setStatus(getString(R.string.stopped), DOT_STOPPED)
                 }
                 poleDetections.isNotEmpty() -> {
                     val label = poleDetections.first()
                         .categories().maxByOrNull { it.score() }
-                        ?.categoryName() ?: "Traffic Light"
-                    binding.statusText.text = "DETECTED: ${label.uppercase()}"
-                    binding.statusText.setBackgroundResource(R.color.alert_red)
+                        ?.categoryName()?.uppercase() ?: "TRAFFIC LIGHT"
+                    setStatus("DETECTED: $label", DOT_DETECTED)
                     soundManager.playAlert()
                 }
                 else -> {
-                    binding.statusText.text = getString(R.string.scanning)
-                    binding.statusText.setBackgroundResource(R.color.status_bg)
+                    setStatus(getString(R.string.scanning), DOT_SCANNING)
                 }
             }
         }
@@ -213,6 +244,14 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
     }
 
+    /** Update the status text and the coloured indicator dot together. */
+    private fun setStatus(text: String, dotColor: Int) {
+        binding.statusText.text = text
+        binding.statusDot.backgroundTintList = ColorStateList.valueOf(dotColor)
+    }
+
+    // ── Lifecycle cleanup ─────────────────────────────────────────────────────
+
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
@@ -223,16 +262,20 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     companion object {
         private const val TAG = "MainActivity"
 
-        /** Speed below which alerts are suppressed (m/s). 2 m/s ≈ 7 km/h */
-        private const val MOVING_THRESHOLD_MS = 2f
+        // Speed gate
+        private const val MOVING_THRESHOLD_MS   = 2f          // ~7 km/h
+        private const val NO_FIX_SPEED          = -1f
 
-        /** Sentinel meaning GPS has not yet provided a speed reading. */
-        private const val NO_FIX_SPEED = -1f
-
-        /** Request a location update every second. */
-        private const val LOCATION_INTERVAL_MS = 1_000L
-
-        /** Minimum displacement between updates (0 = every interval). */
+        // Location updates
+        private const val LOCATION_INTERVAL_MS  = 1_000L
         private const val LOCATION_MIN_DISTANCE_M = 0f
+
+        // Zoom
+        private const val ZOOM_STEP = 0.5f
+
+        // Status dot colours
+        private val DOT_SCANNING = Color.parseColor("#2ECC71")  // green
+        private val DOT_DETECTED = Color.parseColor("#E53935")  // red
+        private val DOT_STOPPED  = Color.parseColor("#FFB300")  // amber
     }
 }

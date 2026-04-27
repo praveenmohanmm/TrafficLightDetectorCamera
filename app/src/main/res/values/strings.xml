@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Traffic Pole Detector</string>
+    <string name="app_name">Traffic Light Detector</string>
     <string name="scanning">Scanning for traffic lights…</string>
     <string name="stopped">STOPPED — alerts paused</string>
 </resources>

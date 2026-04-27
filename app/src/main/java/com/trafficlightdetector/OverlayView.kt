@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
@@ -12,8 +12,12 @@ import com.google.mediapipe.tasks.components.containers.Detection
 
 /**
  * Transparent overlay drawn on top of the camera preview.
- * - Traffic-pole detections → red box, yellow label
- * - All other detections    → green box, white label
+ *
+ * Draws a professional corner-bracket style bounding box for each detection
+ * with a clean label chip above the top-left corner.
+ *
+ * All shown detections are traffic lights (filtered upstream), so a single
+ * cyan colour scheme is used throughout.
  */
 class OverlayView @JvmOverloads constructor(
     context: Context,
@@ -25,33 +29,32 @@ class OverlayView @JvmOverloads constructor(
     private var srcWidth  = 1
     private var srcHeight = 1
 
-    private val normalBoxPaint = Paint().apply {
+    // ── Paints ────────────────────────────────────────────────────────────────
+
+    /** Corner bracket strokes */
+    private val bracketPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style       = Paint.Style.STROKE
-        strokeWidth = 6f
-        color       = Color.GREEN
+        strokeWidth = 5f
+        strokeCap   = Paint.Cap.ROUND
+        color       = Color.parseColor("#00B4D8")   // cyan accent
     }
-    private val poleBoxPaint = Paint().apply {
-        style       = Paint.Style.STROKE
-        strokeWidth = 10f
-        color       = Color.RED
-    }
-    private val labelBackPaint = Paint().apply {
+
+    /** Semi-transparent fill behind the label text */
+    private val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.parseColor("#B3000000")
+        color = Color.parseColor("#D90D1117")
     }
-    private val normalLabelPaint = Paint().apply {
-        color    = Color.WHITE
-        textSize = 40f
-        typeface = Typeface.DEFAULT_BOLD
-        isAntiAlias = true
+
+    /** Label text */
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color    = Color.parseColor("#00B4D8")
+        textSize = 36f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
-    private val poleLabelPaint = Paint().apply {
-        color    = Color.YELLOW
-        textSize = 44f
-        typeface = Typeface.DEFAULT_BOLD
-        isAntiAlias = true
-    }
-    private val textBounds = Rect()
+
+    private val labelRect = RectF()
+
+    // ── Data update ───────────────────────────────────────────────────────────
 
     fun update(
         all:         List<Detection>,
@@ -66,6 +69,8 @@ class OverlayView @JvmOverloads constructor(
         invalidate()
     }
 
+    // ── Drawing ───────────────────────────────────────────────────────────────
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -73,27 +78,71 @@ class OverlayView @JvmOverloads constructor(
         val scaleY = height.toFloat() / srcHeight
 
         for (det in allDetections) {
-            val isPole    = poleDetections.contains(det)
-            val boxPaint  = if (isPole) poleBoxPaint  else normalBoxPaint
-            val lblPaint  = if (isPole) poleLabelPaint else normalLabelPaint
-
             val box = det.boundingBox()
             val l = box.left   * scaleX
             val t = box.top    * scaleY
             val r = box.right  * scaleX
             val b = box.bottom * scaleY
 
-            canvas.drawRect(l, t, r, b, boxPaint)
+            drawCornerBrackets(canvas, l, t, r, b)
 
             val topCat = det.categories().maxByOrNull { it.score() } ?: continue
-            val label  = "${topCat.categoryName() ?: "?"}  ${"%.0f".format(topCat.score() * 100)}%"
+            val score  = (topCat.score() * 100).toInt()
+            val label  = "${topCat.categoryName()?.uppercase() ?: "TRAFFIC LIGHT"}  $score%"
 
-            lblPaint.getTextBounds(label, 0, label.length, textBounds)
-            val lblW = textBounds.width().toFloat()
-            val lblH = textBounds.height().toFloat()
-
-            canvas.drawRect(l, t - lblH - 12f, l + lblW + 16f, t, labelBackPaint)
-            canvas.drawText(label, l + 8f, t - 6f, lblPaint)
+            drawLabel(canvas, label, l, t)
         }
+    }
+
+    /**
+     * Draws four L-shaped corner brackets instead of a full rectangle.
+     * Corner arm length = 22% of the shorter dimension of the box.
+     */
+    private fun drawCornerBrackets(canvas: Canvas, l: Float, t: Float, r: Float, b: Float) {
+        val cx = (r - l) * 0.22f
+        val cy = (b - t) * 0.22f
+
+        // Top-left
+        canvas.drawLine(l, t, l + cx, t, bracketPaint)
+        canvas.drawLine(l, t, l, t + cy, bracketPaint)
+        // Top-right
+        canvas.drawLine(r - cx, t, r, t, bracketPaint)
+        canvas.drawLine(r, t, r, t + cy, bracketPaint)
+        // Bottom-left
+        canvas.drawLine(l, b - cy, l, b, bracketPaint)
+        canvas.drawLine(l, b, l + cx, b, bracketPaint)
+        // Bottom-right
+        canvas.drawLine(r - cx, b, r, b, bracketPaint)
+        canvas.drawLine(r, b - cy, r, b, bracketPaint)
+    }
+
+    /**
+     * Draws a rounded label chip anchored to the top-left of the box.
+     */
+    private fun drawLabel(canvas: Canvas, text: String, boxLeft: Float, boxTop: Float) {
+        val fm      = labelPaint.fontMetrics
+        val textW   = labelPaint.measureText(text)
+        val textH   = fm.descent - fm.ascent
+        val padH    = 10f
+        val padV    = 6f
+        val radius  = 8f
+
+        val chipLeft   = boxLeft
+        val chipTop    = boxTop - textH - padV * 2 - 4f
+        val chipRight  = boxLeft + textW + padH * 2
+        val chipBottom = boxTop - 4f
+
+        // Keep chip on screen
+        val clampedTop    = chipTop.coerceAtLeast(0f)
+        val clampedBottom = chipBottom.coerceAtLeast(clampedTop + textH + padV * 2)
+
+        labelRect.set(chipLeft, clampedTop, chipRight, clampedBottom)
+        canvas.drawRoundRect(labelRect, radius, radius, labelBgPaint)
+        canvas.drawText(
+            text,
+            chipLeft + padH,
+            clampedBottom - padV - fm.descent,
+            labelPaint
+        )
     }
 }

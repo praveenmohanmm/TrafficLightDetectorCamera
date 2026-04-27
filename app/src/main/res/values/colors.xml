@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="status_bg">#CC000000</color>
-    <color name="alert_red">#CCCC0000</color>
+    <!-- Brand -->
+    <color name="colorPrimary">#00B4D8</color>
+    <color name="colorPrimaryVariant">#0077B6</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    <color name="colorSecondary">#2ECC71</color>
+
+    <!-- Dark UI surfaces -->
+    <color name="colorBackground">#0D1117</color>
+    <color name="colorSurface">#161B22</color>
+    <color name="colorOverlay">#CC0D1117</color>
+    <color name="colorOverlayStrong">#E60D1117</color>
+
+    <!-- Status dot colours -->
+    <color name="dotScanning">#2ECC71</color>
+    <color name="dotDetected">#E53935</color>
+    <color name="dotStopped">#FFB300</color>
+
+    <!-- Detection alert -->
+    <color name="alert_red">#E53935</color>
+
+    <!-- Legacy alias (used in code) -->
+    <color name="status_bg">#CC0D1117</color>
 </resources>

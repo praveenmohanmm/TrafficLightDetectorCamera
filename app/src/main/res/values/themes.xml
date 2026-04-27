@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.TrafficLightDetectorCamera" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#CC0000</item>
-        <item name="colorPrimaryVariant">#990000</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">#FFD600</item>
+    <style name="Theme.TrafficLightDetectorCamera"
+        parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+        <item name="colorSecondary">@color/colorSecondary</item>
         <item name="colorOnSecondary">#000000</item>
-        <item name="android:statusBarColor">#CC0000</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 </resources>

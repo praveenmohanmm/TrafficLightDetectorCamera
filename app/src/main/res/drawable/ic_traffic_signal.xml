@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 24dp traffic-light icon, white housing with coloured lights -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Housing (rounded rectangle) -->
+    <path
+        android:fillColor="#ECEFF1"
+        android:pathData="M38,16 L70,16 Q76,16 76,22 L76,92 Q76,98 70,98 L38,98 Q32,98 32,92 L32,22 Q32,16 38,16 Z" />
+
+    <!-- Red light -->
+    <path
+        android:fillColor="#EF5350"
+        android:pathData="M54,34 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
+
+    <!-- Amber light -->
+    <path
+        android:fillColor="#FFA726"
+        android:pathData="M54,57 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
+
+    <!-- Green light -->
+    <path
+        android:fillColor="#66BB6A"
+        android:pathData="M54,80 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
+</vector>
