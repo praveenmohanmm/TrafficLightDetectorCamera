@@ -186,6 +186,8 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
                     preview,
                     imageAnalysis
                 )
+                // Apply default zoom after binding
+                camera?.cameraControl?.setZoomRatio(DEFAULT_ZOOM)
                 observeZoomState()
             } catch (e: Exception) {
                 Log.e(TAG, "Camera binding failed", e)
@@ -291,7 +293,8 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         private const val LOCATION_MIN_DISTANCE_M = 0f
 
         // Zoom
-        private const val ZOOM_STEP = 0.5f
+        private const val DEFAULT_ZOOM = 1.5f
+        private const val ZOOM_STEP    = 0.5f
 
         // Status dot colours
         private val DOT_SCANNING = Color.parseColor("#2ECC71")  // green
