@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traffic Light Detector — AI Camera App for Android</title>
+  <meta name="description" content="Real-time AI traffic light detection for Android. Audio alerts when approaching signals. Works fully offline. No data collected." />
+  <meta property="og:title" content="Traffic Light Detector — AI Camera App for Android" />
+  <meta property="og:description" content="Real-time AI traffic light detection. Audio alerts. Speed-aware. 100% offline." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0D1117;
+      --surface:  #161B22;
+      --surface2: #1C2128;
+      --border:   #30363D;
+      --cyan:     #00B4D8;
+      --cyan-dim: #00B4D822;
+      --green:    #2ECC71;
+      --red:      #E53935;
+      --amber:    #FFB300;
+      --text:     #E6EDF3;
+      --muted:    #7D8590;
+      --radius:   14px;
+      --shadow:   0 8px 32px #00000066;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ───────────────────────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 5%;
+      height: 64px;
+      background: #0D1117CC;
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1rem; letter-spacing: -.01em;
+    }
+
+    .nav-logo svg { flex-shrink: 0; }
+
+    .nav-actions { display: flex; gap: 10px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: .875rem; font-weight: 600;
+      cursor: pointer; border: none; transition: .15s;
+    }
+
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+    .btn-primary {
+      background: var(--cyan); color: #000;
+    }
+    .btn-primary:hover { background: #22D0F0; }
+
+    .btn-outline {
+      background: transparent; color: var(--cyan);
+      border: 1px solid var(--cyan);
+    }
+    .btn-outline:hover { background: var(--cyan-dim); }
+
+    /* ── Sections ──────────────────────────────────────────────────────────── */
+    section { padding: 96px 5%; }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    .section-label {
+      font-size: .75rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--cyan);
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 800; letter-spacing: -.03em;
+      line-height: 1.15; margin-bottom: 16px;
+    }
+
+    .section-sub {
+      font-size: 1.05rem; color: var(--muted);
+      max-width: 540px; margin-bottom: 56px;
+    }
+
+    /* ── Hero ──────────────────────────────────────────────────────────────── */
+    #hero {
+      min-height: 100vh;
+      display: flex; align-items: center;
+      padding-top: 100px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, #00B4D818 0%, transparent 70%),
+        var(--bg);
+    }
+
+    .hero-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 64px; align-items: center;
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--cyan-dim);
+      border: 1px solid #00B4D844;
+      font-size: .8rem; font-weight: 600; color: var(--cyan);
+      margin-bottom: 24px;
+    }
+
+    .hero-badge span.dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .4; transform: scale(.8); }
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.5rem);
+      font-weight: 800; letter-spacing: -.04em;
+      line-height: 1.1; margin-bottom: 20px;
+    }
+
+    h1 .accent { color: var(--cyan); }
+
+    .hero-sub {
+      font-size: 1.1rem; color: var(--muted);
+      max-width: 480px; margin-bottom: 36px;
+    }
+
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 48px; }
+
+    .hero-ctas .btn { padding: 12px 22px; font-size: .95rem; }
+
+    .hero-stats {
+      display: flex; gap: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat-item { display: flex; flex-direction: column; gap: 2px; }
+    .stat-value { font-size: 1.5rem; font-weight: 800; color: var(--text); }
+    .stat-label { font-size: .75rem; color: var(--muted); }
+
+    /* ── Phone mockup ──────────────────────────────────────────────────────── */
+    .phone-wrap {
+      display: flex; justify-content: center; align-items: center;
+      position: relative;
+    }
+
+    .phone {
+      width: 240px;
+      border-radius: 36px;
+      background: #000;
+      border: 3px solid #2A2A2A;
+      box-shadow: 0 0 0 1px #111, var(--shadow), 0 0 80px #00B4D814;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .phone-notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 24px;
+      background: #000; border-radius: 0 0 16px 16px;
+      z-index: 10;
+    }
+
+    .phone-screen {
+      width: 100%;
+      aspect-ratio: 9/19;
+      background: #0A0A0A;
+      position: relative; overflow: hidden;
+    }
+
+    /* Simulated road/camera view */
+    .phone-camera {
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        180deg,
+        #0A0F14 0%,
+        #111820 40%,
+        #0D1520 70%,
+        #080E14 100%
+      );
+    }
+
+    /* Road lines */
+    .road-line {
+      position: absolute; bottom: 30%; left: 50%;
+      transform: translateX(-50%);
+      width: 6px; background: #FFFFFF22;
+      border-radius: 3px;
+      animation: road-scroll 1.2s linear infinite;
+    }
+    .road-line:nth-child(1) { height: 24px; bottom: 28%; animation-delay: 0s; }
+    .road-line:nth-child(2) { height: 20px; bottom: 38%; animation-delay: .4s; opacity: .6; }
+    .road-line:nth-child(3) { height: 16px; bottom: 46%; animation-delay: .8s; opacity: .3; }
+
+    @keyframes road-scroll {
+      from { transform: translateX(-50%) translateY(0); }
+      to   { transform: translateX(-50%) translateY(20px); opacity: 0; }
+    }
+
+    /* Scan line */
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      animation: scan 3s linear infinite;
+      opacity: .5;
+    }
+
+    @keyframes scan {
+      from { top: 10%; }
+      to   { top: 90%; }
+    }
+
+    /* Detection box (corner brackets) */
+    .detection-box {
+      position: absolute;
+      top: 22%; left: 50%;
+      transform: translateX(-50%);
+      width: 48px; height: 60px;
+      animation: detect-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes detect-pulse {
+      0%, 100% { opacity: .8; }
+      50%       { opacity: 1; }
+    }
+
+    .corner { position: absolute; width: 12px; height: 12px; }
+    .corner::before, .corner::after {
+      content: ''; position: absolute;
+      background: var(--cyan);
+    }
+    .corner::before { width: 100%; height: 2px; }
+    .corner::after  { width: 2px; height: 100%; }
+
+    .corner.tl { top: 0; left: 0; }
+    .corner.tr { top: 0; right: 0; transform: scaleX(-1); }
+    .corner.bl { bottom: 0; left: 0; transform: scaleY(-1); }
+    .corner.br { bottom: 0; right: 0; transform: scale(-1); }
+
+    /* Traffic light icon inside detection box */
+    .tl-icon {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px; display: flex; flex-direction: column;
+      align-items: center; gap: 2px; padding: 3px;
+      background: #ECEFF1; border-radius: 3px;
+    }
+
+    .tl-light {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .tl-light.r { background: #EF5350; }
+    .tl-light.y { background: #FFA726; opacity: .4; }
+    .tl-light.g { background: #66BB6A; opacity: .4; }
+
+    /* HUD bar */
+    .phone-hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 40px;
+      background: #CC0D1117;
+      display: flex; align-items: center;
+      padding: 0 10px;
+      gap: 6px;
+    }
+
+    .hud-title {
+      flex: 1;
+      font-size: 7px; font-weight: 700;
+      color: #EEE; letter-spacing: .04em;
+    }
+
+    .hud-speed {
+      font-size: 7px; font-weight: 700;
+      color: var(--cyan);
+      background: #2200B4D8;
+      border: 1px solid #4400B4D8;
+      padding: 2px 5px; border-radius: 4px;
+    }
+
+    /* Status bar */
+    .phone-status {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      margin: 0 8px 8px;
+      background: #E60D1117;
+      border: 1px solid #33FFFFFF;
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .status-dot-phone {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--red);
+      flex-shrink: 0;
+      animation: pulse-dot 1s ease-in-out infinite;
+    }
+
+    .status-text-phone {
+      font-size: 7px; font-weight: 700; color: #FFF;
+    }
+
+    /* Zoom pill */
+    .zoom-pill {
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      width: 18px;
+      background: #D90D1117;
+      border: 1px solid #33FFFFFF;
+      border-radius: 10px;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 4px 0; gap: 2px;
+    }
+
+    .zoom-btn {
+      font-size: 9px; color: #FFF; font-weight: 700;
+      width: 14px; text-align: center; line-height: 14px;
+    }
+
+    .zoom-lbl {
+      font-size: 6px; color: #90FFFFFF; font-weight: 700;
+    }
+
+    .zoom-div { width: 10px; height: 1px; background: #33FFFFFF; }
+
+    /* ── Features ──────────────────────────────────────────────────────────── */
+    #features { background: var(--surface); }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color .2s, transform .2s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-3px);
+    }
+
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; margin-bottom: 16px;
+    }
+
+    .feature-card h3 {
+      font-size: 1rem; font-weight: 700; margin-bottom: 8px;
+    }
+
+    .feature-card p { font-size: .9rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── How it works ──────────────────────────────────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 32px;
+      position: relative;
+    }
+
+    .step {
+      display: flex; flex-direction: column; gap: 14px;
+      padding: 32px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      position: relative;
+    }
+
+    .step-number {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--cyan-dim);
+      border: 2px solid var(--cyan);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .875rem; font-weight: 800; color: var(--cyan);
+    }
+
+    .step h3 { font-size: 1.05rem; font-weight: 700; }
+    .step p  { font-size: .9rem; color: var(--muted); }
+
+    /* ── Specs ─────────────────────────────────────────────────────────────── */
+    #specs { background: var(--surface); }
+
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .spec-item {
+      background: var(--bg);
+      padding: 24px 28px;
+    }
+
+    .spec-label { font-size: .75rem; color: var(--muted); margin-bottom: 6px; }
+    .spec-value { font-size: 1rem; font-weight: 700; color: var(--text); }
+
+    /* ── Download ──────────────────────────────────────────────────────────── */
+    #download {
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 100%, #00B4D812 0%, transparent 70%),
+        var(--bg);
+      text-align: center;
+    }
+
+    #download h2 { max-width: 600px; margin: 0 auto 16px; }
+    #download .section-sub { margin: 0 auto 40px; }
+
+    .download-btns {
+      display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    .download-btns .btn { padding: 14px 28px; font-size: 1rem; }
+
+    .download-note {
+      font-size: .8rem; color: var(--muted);
+    }
+
+    /* ── Footer ────────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 5%;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 16px;
+    }
+
+    .footer-logo {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 700; font-size: .9rem;
+    }
+
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a {
+      font-size: .85rem; color: var(--muted);
+      transition: color .15s;
+    }
+    .footer-links a:hover { color: var(--text); }
+
+    .footer-copy { font-size: .8rem; color: var(--muted); }
+
+    /* ── Pill badges ───────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 999px;
+      font-size: .72rem; font-weight: 600;
+    }
+
+    .badge-green  { background: #2ECC7122; color: var(--green);  border: 1px solid #2ECC7133; }
+    .badge-cyan   { background: var(--cyan-dim); color: var(--cyan); border: 1px solid #00B4D833; }
+    .badge-red    { background: #E5393522; color: var(--red);    border: 1px solid #E5393533; }
+
+    /* ── Fade-in on scroll ─────────────────────────────────────────────────── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity .55s ease, transform .55s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .hero-inner {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+
+      .hero-badge  { justify-content: center; }
+      .hero-sub    { margin: 0 auto 36px; }
+      .hero-ctas   { justify-content: center; }
+      .hero-stats  { justify-content: center; }
+      .phone-wrap  { order: -1; }
+
+      .phone { width: 180px; }
+
+      footer {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .footer-links { justify-content: center; }
+    }
+
+    @media (max-width: 480px) {
+      nav { padding: 0 4%; }
+      section { padding: 72px 4%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────────── -->
+<nav>
+  <a class="nav-logo" href="#">
+    <svg width="26" height="26" viewBox="0 0 108 108" fill="none">
+      <rect x="28" y="12" width="52" height="84" rx="8" fill="#ECEFF1"/>
+      <circle cx="54" cy="32" r="13" fill="#EF5350"/>
+      <circle cx="54" cy="54" r="13" fill="#FFA726"/>
+      <circle cx="54" cy="76" r="13" fill="#66BB6A"/>
+    </svg>
+    Traffic Light Detector
+  </a>
+  <div class="nav-actions">
+    <a class="btn btn-ghost" href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+      </svg>
+      GitHub
+    </a>
+    <a class="btn btn-primary" href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera/releases/latest" target="_blank">
+      Download APK
+    </a>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────────── -->
+<section id="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge">
+        <span class="dot"></span>
+        AI-Powered · Fully Offline · Free
+      </div>
+
+      <h1>Never Miss a<br/><span class="accent">Traffic Light</span></h1>
+
+      <p class="hero-sub">
+        Real-time traffic light detection powered by on-device AI.
+        Audio alerts as you approach signals. Works completely offline —
+        no internet, no data collected, ever.
+      </p>
+
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera/releases/latest" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M5 20h14v-2H5v2zm7-18L5.33 9h3.84v4h5.66V9h3.84L12 2z"/>
+          </svg>
+          Download APK
+        </a>
+        <a class="btn btn-outline" href="#features">See Features</a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat-item">
+          <span class="stat-value">100%</span>
+          <span class="stat-label">Offline</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">~15 MB</span>
+          <span class="stat-label">App size</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">Android 7+</span>
+          <span class="stat-label">Supported</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone mockup -->
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-camera">
+            <div class="road-line"></div>
+            <div class="road-line"></div>
+            <div class="road-line"></div>
+            <div class="scan-line"></div>
+          </div>
+
+          <!-- Detection box with traffic light -->
+          <div class="detection-box">
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="tl-icon">
+              <div class="tl-light r"></div>
+              <div class="tl-light y"></div>
+              <div class="tl-light g"></div>
+            </div>
+          </div>
+
+          <!-- HUD -->
+          <div class="phone-hud">
+            <svg width="10" height="10" viewBox="0 0 108 108">
+              <rect x="28" y="12" width="52" height="84" rx="6" fill="#ECEFF1"/>
+              <circle cx="54" cy="32" r="11" fill="#EF5350"/>
+              <circle cx="54" cy="54" r="11" fill="#FFA726"/>
+              <circle cx="54" cy="76" r="11" fill="#66BB6A"/>
+            </svg>
+            <span class="hud-title">TRAFFIC LIGHT DETECTOR</span>
+            <span class="hud-speed">42 km/h</span>
+          </div>
+
+          <!-- Zoom pill -->
+          <div class="zoom-pill">
+            <div class="zoom-btn">+</div>
+            <div class="zoom-lbl">1.5×</div>
+            <div class="zoom-div"></div>
+            <div class="zoom-btn">−</div>
+          </div>
+
+          <!-- Status bar -->
+          <div class="phone-status">
+            <div class="status-dot-phone"></div>
+            <div class="status-text-phone">DETECTED: TRAFFIC LIGHT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="container">
+    <p class="section-label fade-in">Features</p>
+    <h2 class="fade-in">Everything you need,<br/>nothing you don't</h2>
+    <p class="section-sub fade-in">Built to be fast, lightweight, and distraction-free. Detection runs entirely on your device in real time.</p>
+
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background:#E5393522;">🔴</div>
+        <h3>Real-Time Detection</h3>
+        <p>EfficientDet-Lite0 AI model detects traffic lights in every camera frame — fast and accurate on any modern Android phone.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background:#00B4D822;">🔔</div>
+        <h3>Smart Audio Alert</h3>
+        <p>A sharp high-frequency beep fires the moment a traffic light enters the frame. Loud enough to hear over road noise.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background:#2ECC7122;">🚗</div>
+        <h3>Speed Aware</h3>
+        <p>Alerts automatically pause when you're stationary. GPS speed gates the alert so you won't be bothered at a red light.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background:#FFB30022;">📡</div>
+        <h3>Fully Offline</h3>
+        <p>The AI model is bundled inside the app. No internet connection needed, ever. Works in tunnels, rural areas, anywhere.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background:#00B4D822;">🔍</div>
+        <h3>Built-in Zoom Controls</h3>
+        <p>Floating + / − buttons let you adjust zoom while driving. Starts at 1.5× by default for a longer detection range.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background:#E5393522;">📱</div>
+        <h3>Screen Always On</h3>
+        <p>The display never dims or locks while the app is open. Close the app and normal screen timeout resumes automatically.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ───────────────────────────────────────────────────────────── -->
+<section id="how-it-works">
+  <div class="container">
+    <p class="section-label fade-in">How It Works</p>
+    <h2 class="fade-in">Three steps, zero setup</h2>
+    <p class="section-sub fade-in">No accounts, no configuration, no cloud. Install, open, drive.</p>
+
+    <div class="steps">
+      <div class="step fade-in">
+        <div class="step-number">1</div>
+        <h3>Mount your phone</h3>
+        <p>Place your phone in a windshield or dashboard mount with the back camera facing the road ahead.</p>
+      </div>
+      <div class="step fade-in">
+        <div class="step-number">2</div>
+        <h3>Open the app</h3>
+        <p>Grant camera and location permissions. The app starts scanning instantly — no login, no settings required.</p>
+      </div>
+      <div class="step fade-in">
+        <div class="step-number">3</div>
+        <h3>Drive and listen</h3>
+        <p>A sharp audio alert fires every time a traffic light is detected while you're moving. Stay focused on the road.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Tech specs ─────────────────────────────────────────────────────────────── -->
+<section id="specs">
+  <div class="container">
+    <p class="section-label fade-in">Technical Specs</p>
+    <h2 class="fade-in">Under the hood</h2>
+    <p class="section-sub fade-in">Open source. Lightweight. Built on proven Android libraries.</p>
+
+    <div class="specs-grid fade-in">
+      <div class="spec-item">
+        <div class="spec-label">AI Model</div>
+        <div class="spec-value">EfficientDet-Lite0 (COCO int8)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Inference Engine</div>
+        <div class="spec-value">MediaPipe Tasks Vision</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Camera Pipeline</div>
+        <div class="spec-value">CameraX (Android Jetpack)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Model Size</div>
+        <div class="spec-value">~4.4 MB (bundled in APK)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Min Android</div>
+        <div class="spec-value">Android 7.0 (API 24)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Target SDK</div>
+        <div class="spec-value">Android 14 (API 34)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">App Size</div>
+        <div class="spec-value">~15 MB</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Internet</div>
+        <div class="spec-value">Not required</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Data Collected</div>
+        <div class="spec-value">None</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">Source Code</div>
+        <div class="spec-value">Open source (GitHub)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Download ───────────────────────────────────────────────────────────────── -->
+<section id="download">
+  <div class="container">
+    <p class="section-label fade-in">Get the App</p>
+    <h2 class="fade-in">Free. Open source.<br/>No strings attached.</h2>
+    <p class="section-sub fade-in">Download the APK directly or get it on Google Play.</p>
+
+    <div class="download-btns fade-in">
+      <a class="btn btn-primary" style="padding:14px 28px; font-size:1rem;"
+         href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera/releases/latest"
+         target="_blank">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M5 20h14v-2H5v2zm7-18L5.33 9h3.84v4h5.66V9h3.84L12 2z"/>
+        </svg>
+        Download Latest APK
+      </a>
+      <a class="btn btn-ghost" style="padding:14px 28px; font-size:1rem;"
+         href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera"
+         target="_blank">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        View on GitHub
+      </a>
+    </div>
+
+    <p class="download-note fade-in">
+      To install the APK: enable <strong>Install unknown apps</strong> in Android Settings, then open the downloaded file.
+    </p>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-logo">
+    <svg width="22" height="22" viewBox="0 0 108 108" fill="none">
+      <rect x="28" y="12" width="52" height="84" rx="8" fill="#ECEFF1"/>
+      <circle cx="54" cy="32" r="13" fill="#EF5350"/>
+      <circle cx="54" cy="54" r="13" fill="#FFA726"/>
+      <circle cx="54" cy="76" r="13" fill="#66BB6A"/>
+    </svg>
+    Traffic Light Detector
+  </div>
+  <div class="footer-links">
+    <a href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera" target="_blank">Source Code</a>
+    <a href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera/releases" target="_blank">Releases</a>
+    <a href="https://github.com/praveenmohanmm/TrafficLightDetectorCamera/issues" target="_blank">Report Issue</a>
+  </div>
+  <p class="footer-copy">Built with CameraX · MediaPipe · Kotlin</p>
+</footer>
+
+<!-- ── Scroll animations ──────────────────────────────────────────────────────── -->
+<script>
+  const observer = new IntersectionObserver(
+    entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+    { threshold: 0.12 }
+  );
+  document.querySelectorAll('.fade-in').forEach((el, i) => {
+    el.style.transitionDelay = (i % 4) * 0.08 + 's';
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>
