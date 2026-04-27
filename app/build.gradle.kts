@@ -25,6 +25,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Only include native libs for real phone architectures.
+        // Drops x86 / x86_64 (emulator-only) — cuts ~30 MB from MediaPipe .so files.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {
@@ -40,7 +46,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled   = true   // R8 removes unused code
+            isShrinkResources = true   // removes unused drawables/strings/etc.
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
