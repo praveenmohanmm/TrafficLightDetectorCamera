@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   This app makes no network requests.
-  Explicitly block all cleartext (HTTP) traffic as a defence-in-depth measure.
+  Block cleartext HTTP as a defence-in-depth measure.
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </base-config>
+    <base-config cleartextTrafficPermitted="false" />
 </network-security-config>

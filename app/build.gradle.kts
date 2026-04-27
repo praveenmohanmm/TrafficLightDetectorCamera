@@ -53,8 +53,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled   = true   // R8 dead-code elimination
-            isShrinkResources = true   // remove unused resources
+            // Minification disabled: MediaPipe resolves app classes by name via
+            // JNI at runtime — R8 renaming them causes a crash even with keep rules.
+            // The ABI filter already saves ~30 MB; re-enable minification only after
+            // thorough device testing with a full mapping.txt review.
+            isMinifyEnabled   = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
