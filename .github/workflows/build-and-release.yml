@@ -50,46 +50,55 @@ jobs:
       - name: Download EfficientDet-Lite0 model
         run: bash scripts/download_model.sh
 
-      # ── 6. Detect whether signing secrets exist ──────────────────────────────
-      #   secrets context cannot be used in step `if:` expressions directly,
-      #   so we expose the flag via GITHUB_OUTPUT from a run step instead.
-      - name: Check signing secrets
-        id: signing
+      # ── 6. Prepare signing keystore ──────────────────────────────────────────
+      #   • If KEYSTORE_BASE64 secret is set → decode it (your own release key)
+      #   • Otherwise                        → generate a fresh self-signed key
+      #   Either way, STORE_FILE / STORE_PASS / KEY_ALIAS / KEY_PASS are exported
+      #   so step 7 always builds a proper signed release APK.
+      - name: Prepare keystore
+        id: ks
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS:       ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:    ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD:  ${{ secrets.STORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Using repository signing key"
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
+            echo "store_file=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_OUTPUT"
+            echo "store_pass=$STORE_PASSWORD"                >> "$GITHUB_OUTPUT"
+            echo "key_alias=$KEY_ALIAS"                     >> "$GITHUB_OUTPUT"
+            echo "key_pass=$KEY_PASSWORD"                   >> "$GITHUB_OUTPUT"
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No signing secret found — generating a self-signed keystore"
+            keytool -genkey -v \
+              -keystore "$GITHUB_WORKSPACE/keystore.jks" \
+              -alias    "traffic-detector" \
+              -keyalg   RSA -keysize 2048 -validity 10000 \
+              -storepass "ci_store_pass" \
+              -keypass   "ci_key_pass" \
+              -dname     "CN=CI Build, OU=CI, O=TrafficLightDetector, L=Unknown, ST=Unknown, C=US"
+            echo "store_file=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_OUTPUT"
+            echo "store_pass=ci_store_pass"                  >> "$GITHUB_OUTPUT"
+            echo "key_alias=traffic-detector"                >> "$GITHUB_OUTPUT"
+            echo "key_pass=ci_key_pass"                      >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 7a. Signed release APK (when KEYSTORE_BASE64 secret is set) ──────────
-      - name: Build signed release APK
-        if: steps.signing.outputs.available == 'true'
-        env:
-          KEYSTORE_BASE64:  ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_ALIAS:        ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD:     ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD:   ${{ secrets.STORE_PASSWORD }}
+      # ── 7. Build signed release APK ──────────────────────────────────────────
+      - name: Build release APK
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/keystore.jks" \
-            -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-
-      # ── 7b. Debug APK fallback (no secrets needed) ───────────────────────────
-      - name: Build debug APK
-        if: steps.signing.outputs.available == 'false'
-        run: ./gradlew assembleDebug
+            -Pandroid.injected.signing.store.file="${{ steps.ks.outputs.store_file }}" \
+            -Pandroid.injected.signing.store.password="${{ steps.ks.outputs.store_pass }}" \
+            -Pandroid.injected.signing.key.alias="${{ steps.ks.outputs.key_alias }}" \
+            -Pandroid.injected.signing.key.password="${{ steps.ks.outputs.key_pass }}"
 
       # ── 8. Locate built APK ──────────────────────────────────────────────────
       - name: Find APK path
         id: apk
         run: |
-          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           echo "name=$(basename $APK)" >> "$GITHUB_OUTPUT"
 
