@@ -12,3 +12,7 @@ captures/
 
 # Model file — download via scripts/download_model.sh before building
 app/src/main/assets/*.tflite
+
+# Signing — written by CI, must never be committed
+keystore.properties
+*.jks

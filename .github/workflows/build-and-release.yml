@@ -11,7 +11,7 @@ on:
         default: ''
 
 permissions:
-  contents: write   # needed to create GitHub Releases
+  contents: write
 
 jobs:
   build:
@@ -50,13 +50,11 @@ jobs:
       - name: Download EfficientDet-Lite0 model
         run: bash scripts/download_model.sh
 
-      # ── 6. Prepare signing keystore ──────────────────────────────────────────
-      #   • If KEYSTORE_BASE64 secret is set → decode it (your own release key)
-      #   • Otherwise                        → generate a fresh self-signed key
-      #   Either way, STORE_FILE / STORE_PASS / KEY_ALIAS / KEY_PASS are exported
-      #   so step 7 always builds a proper signed release APK.
+      # ── 6. Write keystore.properties ─────────────────────────────────────────
+      #   If KEYSTORE_BASE64 secret is set  → decode the real keystore.
+      #   Otherwise                         → generate a self-signed keystore.
+      #   Both paths write keystore.properties so build.gradle.kts reads it.
       - name: Prepare keystore
-        id: ks
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_ALIAS:       ${{ secrets.KEY_ALIAS }}
@@ -66,33 +64,34 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using repository signing key"
             echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
-            echo "store_file=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_OUTPUT"
-            echo "store_pass=$STORE_PASSWORD"                >> "$GITHUB_OUTPUT"
-            echo "key_alias=$KEY_ALIAS"                     >> "$GITHUB_OUTPUT"
-            echo "key_pass=$KEY_PASSWORD"                   >> "$GITHUB_OUTPUT"
+            cat > "$GITHUB_WORKSPACE/keystore.properties" <<EOF
+          storeFile=$GITHUB_WORKSPACE/keystore.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
           else
-            echo "No signing secret found — generating a self-signed keystore"
+            echo "No signing secret — generating self-signed keystore"
             keytool -genkey -v \
               -keystore "$GITHUB_WORKSPACE/keystore.jks" \
-              -alias    "traffic-detector" \
+              -alias    "ci-key" \
               -keyalg   RSA -keysize 2048 -validity 10000 \
               -storepass "ci_store_pass" \
               -keypass   "ci_key_pass" \
               -dname     "CN=CI Build, OU=CI, O=TrafficLightDetector, L=Unknown, ST=Unknown, C=US"
-            echo "store_file=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_OUTPUT"
-            echo "store_pass=ci_store_pass"                  >> "$GITHUB_OUTPUT"
-            echo "key_alias=traffic-detector"                >> "$GITHUB_OUTPUT"
-            echo "key_pass=ci_key_pass"                      >> "$GITHUB_OUTPUT"
+            cat > "$GITHUB_WORKSPACE/keystore.properties" <<EOF
+          storeFile=$GITHUB_WORKSPACE/keystore.jks
+          storePassword=ci_store_pass
+          keyAlias=ci-key
+          keyPassword=ci_key_pass
+          EOF
           fi
+          echo "keystore.properties written:"
+          cat "$GITHUB_WORKSPACE/keystore.properties"
 
       # ── 7. Build signed release APK ──────────────────────────────────────────
       - name: Build release APK
-        run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="${{ steps.ks.outputs.store_file }}" \
-            -Pandroid.injected.signing.store.password="${{ steps.ks.outputs.store_pass }}" \
-            -Pandroid.injected.signing.key.alias="${{ steps.ks.outputs.key_alias }}" \
-            -Pandroid.injected.signing.key.password="${{ steps.ks.outputs.key_pass }}"
+        run: ./gradlew assembleRelease
 
       # ── 8. Locate built APK ──────────────────────────────────────────────────
       - name: Find APK path
