@@ -40,18 +40,22 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private var camera: Camera? = null
 
     /**
-     * Current GPS speed in m/s.
-     * -1f = no GPS fix yet → alerts allowed (fail-safe).
+     * Current speed in m/s.
+     * Starts at 0 (stationary) — alerts are suppressed until GPS confirms movement.
+     * If the location provider cannot supply a speed value we keep 0 (conservative:
+     * no false alerts while standing still).
      */
-    @Volatile private var currentSpeedMs: Float = NO_FIX_SPEED
+    @Volatile private var currentSpeedMs: Float = 0f
 
     private val isMoving: Boolean
-        get() = currentSpeedMs < 0f || currentSpeedMs >= MOVING_THRESHOLD_MS
+        get() = currentSpeedMs >= MOVING_THRESHOLD_MS
 
     // ── Location listener ─────────────────────────────────────────────────────
 
     private val locationListener = LocationListener { location ->
-        currentSpeedMs = if (location.hasSpeed()) location.speed else NO_FIX_SPEED
+        // If the provider cannot supply a speed value treat it as 0 (stationary).
+        // This prevents the old "no-fix = allow alerts" false positives.
+        currentSpeedMs = if (location.hasSpeed()) location.speed else 0f
         runOnUiThread { updateSpeedBadge() }
     }
 
@@ -202,10 +206,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     }
 
     private fun updateSpeedBadge() {
-        binding.speedBadge.text = if (currentSpeedMs >= 0f)
-            "${"%.0f".format(currentSpeedMs * 3.6f)} km/h"
-        else
-            "-- km/h"
+        binding.speedBadge.text = "${"%.0f".format(currentSpeedMs * 3.6f)} km/h"
     }
 
     // ── ObjectDetectorHelper.DetectorListener ────────────────────────────────
@@ -262,9 +263,8 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     companion object {
         private const val TAG = "MainActivity"
 
-        // Speed gate
-        private const val MOVING_THRESHOLD_MS   = 2f          // ~7 km/h
-        private const val NO_FIX_SPEED          = -1f
+        // Speed gate — alerts only fire above this threshold
+        private const val MOVING_THRESHOLD_MS = 2f             // ~7 km/h
 
         // Location updates
         private const val LOCATION_INTERVAL_MS  = 1_000L
