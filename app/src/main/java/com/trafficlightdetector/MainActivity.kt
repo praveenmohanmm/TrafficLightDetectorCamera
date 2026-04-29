@@ -17,6 +17,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -122,6 +124,16 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         detector      = ObjectDetectorHelper(context = this, listener = this)
         cameraExecutor = Executors.newSingleThreadExecutor()
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+
+        // Push the HUD bar below the status bar + notch/display-cutout area.
+        // Works on all Android versions and every notch shape.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.hudBar) { view, insets ->
+            val topInset = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            ).top
+            view.setPadding(view.paddingLeft, topInset, view.paddingRight, view.paddingBottom)
+            insets
+        }
 
         setupZoomButtons()
 
