@@ -1,4 +1,4 @@
-package com.trafficlightdetector
+package com.poodlesoft.trafficlightdetector
 
 import android.content.Context
 import android.graphics.Canvas

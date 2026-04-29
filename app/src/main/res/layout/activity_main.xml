@@ -17,7 +17,7 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- ── Bounding-box detection overlay ──────────────────────────────────── -->
-    <com.trafficlightdetector.OverlayView
+    <com.poodlesoft.trafficlightdetector.OverlayView
         android:id="@+id/overlay"
         android:layout_width="0dp"
         android:layout_height="0dp"

@@ -21,11 +21,11 @@ val ciBuildNumber  = (System.getenv("BUILD_NUMBER")  ?: "1").toInt()
 val ciVersionName  = System.getenv("VERSION_NAME")   ?: "1.0-dev"
 
 android {
-    namespace  = "com.trafficlightdetector"
+    namespace  = "com.poodlesoft.trafficlightdetector"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.trafficlightdetector"
+        applicationId = "com.poodlesoft.trafficlightdetector"
         minSdk        = 24
         targetSdk     = 34
         versionCode   = ciBuildNumber

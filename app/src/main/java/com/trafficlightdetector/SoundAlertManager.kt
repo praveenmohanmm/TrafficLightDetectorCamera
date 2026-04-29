@@ -1,4 +1,4 @@
-package com.trafficlightdetector
+package com.poodlesoft.trafficlightdetector
 
 import android.media.AudioManager
 import android.media.ToneGenerator

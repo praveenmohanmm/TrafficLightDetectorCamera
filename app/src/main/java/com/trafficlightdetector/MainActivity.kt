@@ -1,4 +1,4 @@
-package com.trafficlightdetector
+package com.poodlesoft.trafficlightdetector
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -24,7 +24,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.google.mediapipe.tasks.components.containers.Detection
-import com.trafficlightdetector.databinding.ActivityMainBinding
+import com.poodlesoft.trafficlightdetector.databinding.ActivityMainBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
